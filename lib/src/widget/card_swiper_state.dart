@@ -88,13 +88,103 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
           padding: widget.padding,
           child: LayoutBuilder(
             builder: (BuildContext context, BoxConstraints constraints) {
-              return Stack(
-                clipBehavior: Clip.none,
-                fit: StackFit.expand,
-                children: List.generate(numberOfCardsOnScreen(), (index) {
-                  if (index == 0) return _frontItem(constraints);
-                  return _backItem(constraints, index);
-                }).reversed.toList(),
+              return GestureDetector(
+                onPanStart: (tapInfo) {
+                  if (!widget.isDisabled) {
+                    final renderBox = context.findRenderObject()! as RenderBox;
+                    final position =
+                        renderBox.globalToLocal(tapInfo.globalPosition);
+                    if (position.dy < renderBox.size.height / 2)
+                      _tappedOnTop = true;
+                  }
+                },
+                onPanUpdate: (tapInfo) {
+                  if (!widget.isDisabled) {
+                    print('onPanUpdate ${tapInfo.toString()}');
+                    if (widget.allowedSwipeBackDirection != null) {
+                      final angleRad =
+                          (widget.allowedSwipeBackDirection!.angle - 90) *
+                              math.pi /
+                              180;
+                      final backDir =
+                          Offset(math.cos(angleRad), math.sin(angleRad));
+                      final deltaProjection = tapInfo.delta.dx * backDir.dx +
+                          tapInfo.delta.dy * backDir.dy;
+
+                      if (!widget.isLoop &&
+                          _currentIndex == widget.cardsCount - 1) {
+                        if (deltaProjection <= 0) {
+                          return;
+                        }
+                      }
+
+                      final atCenter = _cardAnimation.left.abs() < 5.0 &&
+                          _cardAnimation.top.abs() < 5.0;
+                      if (!_isBackSwipe && atCenter && deltaProjection > 0) {
+                        _startBackSwipe();
+                        return;
+                      }
+                      if (_isBackSwipe) {
+                        _backSwipeDragDistance +=
+                            deltaProjection * slowBackSwipeFactor;
+                        double progress =
+                            (_backSwipeDragDistance / widget.threshold)
+                                .clamp(0.0, 1.0);
+                        _updateBackSwipeProgress(progress);
+                        return;
+                      }
+                    }
+                    setState(() => _cardAnimation.update(
+                        tapInfo.delta.dx, tapInfo.delta.dy, _tappedOnTop));
+                  }
+                },
+                onPanEnd: (tapInfo) {
+                  final velocity = tapInfo.velocity.pixelsPerSecond.distance;
+                  if (_isBackSwipe) {
+                    if (_backSwipeProgress >= 0.3 || velocity > 1000) {
+                      _swipeType = SwipeType.backSwipe;
+                      _cardAnimation.animateBackSwipeComplete(context);
+                    } else {
+                      _swipeType = SwipeType.backSwipeCancel;
+                      final size = MediaQuery.of(context).size;
+                      final angleRad =
+                          (widget.allowedSwipeBackDirection!.angle - 90) *
+                              math.pi /
+                              180;
+                      final magnitude = size.width;
+                      final targetLeft = -magnitude * math.cos(angleRad);
+                      final targetTop = -magnitude * math.sin(angleRad);
+                      _cardAnimation.animateUndoCancel(
+                        context,
+                        targetLeft,
+                        targetTop,
+                        1.0,
+                        widget.backCardOffset,
+                      );
+                    }
+                    _isBackSwipe = false;
+                    _backSwipeDragDistance = 0.0;
+                    _backSwipeProgress = 0.0;
+                    return;
+                  }
+                  if (_canSwipe) {
+                    _tappedOnTop = false;
+                    _onEndAnimation();
+                  }
+                },
+                onTap: () async {
+                  if (widget.isDisabled) {
+                    await widget.onTapDisabled?.call();
+                  }
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  fit: StackFit.expand,
+                  children: List.generate(numberOfCardsOnScreen(), (index) {
+                    if (index == 0) return _frontItem(constraints);
+                    return _backItem(constraints, index);
+                  }).reversed.toList(),
+                ),
               );
             },
           ),
@@ -107,116 +197,17 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
     return Positioned(
       left: _cardAnimation.left,
       top: _cardAnimation.top,
-      child: GestureDetector(
-        child: Transform.rotate(
-          angle: _cardAnimation.angle,
-          child: ConstrainedBox(
-            constraints: constraints,
-            child: widget.cardBuilder(
-              context,
-              _currentIndex!,
-              (100 * _cardAnimation.left / widget.threshold).ceil(),
-              (100 * _cardAnimation.top / widget.threshold).ceil(),
-            ),
+      child: Transform.rotate(
+        angle: _cardAnimation.angle,
+        child: ConstrainedBox(
+          constraints: constraints,
+          child: widget.cardBuilder(
+            context,
+            _currentIndex!,
+            (100 * _cardAnimation.left / widget.threshold).ceil(),
+            (100 * _cardAnimation.top / widget.threshold).ceil(),
           ),
         ),
-        onTap: () async {
-          if (widget.isDisabled) {
-            await widget.onTapDisabled?.call();
-          }
-        },
-        onPanStart: (tapInfo) {
-          if (!widget.isDisabled) {
-            final renderBox = context.findRenderObject()! as RenderBox;
-            final position = renderBox.globalToLocal(tapInfo.globalPosition);
-            if (position.dy < renderBox.size.height / 2) _tappedOnTop = true;
-          }
-        },
-        onPanUpdate: (tapInfo) {
-          if (!widget.isDisabled) {
-            // If an allowed back swipe direction is provided,
-            // compute the dot product of the delta with that direction.
-            if (widget.allowedSwipeBackDirection != null) {
-              final angleRad = (widget.allowedSwipeBackDirection!.angle - 90) *
-                  math.pi /
-                  180;
-              final backDir = Offset(math.cos(angleRad), math.sin(angleRad));
-              final deltaProjection =
-                  tapInfo.delta.dx * backDir.dx + tapInfo.delta.dy * backDir.dy;
-
-              // If we're on the last card in non-loop mode,
-              // only allow a gesture if it's in the back swipe direction.
-              if (!widget.isLoop && _currentIndex == widget.cardsCount - 1) {
-                if (deltaProjection <= 0) {
-                  // Ignore any gesture that is not along the back swipe direction.
-                  return;
-                }
-              }
-
-              // Only trigger back swipe if the card is nearly centered.
-              final atCenter = _cardAnimation.left.abs() < 5.0 &&
-                  _cardAnimation.top.abs() < 5.0;
-
-              // If not already in back swipe mode and movement is along the back direction:
-              if (!_isBackSwipe && atCenter && deltaProjection > 0) {
-                _startBackSwipe();
-                return;
-              }
-              // If in back swipe mode, update progress.
-              if (_isBackSwipe) {
-                _backSwipeDragDistance += deltaProjection * slowBackSwipeFactor;
-                double progress =
-                    (_backSwipeDragDistance / widget.threshold).clamp(0.0, 1.0);
-                _updateBackSwipeProgress(progress);
-                return;
-              }
-            }
-            // Otherwise, perform normal swipe update.
-            setState(
-              () => _cardAnimation.update(
-                tapInfo.delta.dx,
-                tapInfo.delta.dy,
-                _tappedOnTop,
-              ),
-            );
-          }
-        },
-        onPanEnd: (tapInfo) {
-          final velocity = tapInfo.velocity.pixelsPerSecond.distance;
-          if (_isBackSwipe) {
-            if (_backSwipeProgress >= 0.3 || velocity > 1000) {
-              // Complete the back swipe from the current state to centered.
-              _swipeType = SwipeType.backSwipe;
-              _cardAnimation.animateBackSwipeComplete(context);
-            } else {
-              // Cancel: animate from current state back to the opposite off–screen position.
-              _swipeType = SwipeType.backSwipeCancel;
-              final size = MediaQuery.of(context).size;
-              final angleRad = (widget.allowedSwipeBackDirection!.angle - 90) *
-                  math.pi /
-                  180;
-              final magnitude = size.width;
-              // Calculate the off–screen target from the opposite direction.
-              final targetLeft = -magnitude * math.cos(angleRad);
-              final targetTop = -magnitude * math.sin(angleRad);
-              _cardAnimation.animateUndoCancel(
-                context,
-                targetLeft,
-                targetTop,
-                1.0, // target scale (off-screen)
-                widget.backCardOffset,
-              );
-            }
-            _isBackSwipe = false;
-            _backSwipeDragDistance = 0.0;
-            _backSwipeProgress = 0.0;
-            return;
-          }
-          if (_canSwipe) {
-            _tappedOnTop = false;
-            _onEndAnimation();
-          }
-        },
       ),
     );
   }
