@@ -144,6 +144,15 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
               final deltaProjection =
                   tapInfo.delta.dx * backDir.dx + tapInfo.delta.dy * backDir.dy;
 
+              // If we're on the last card in non-loop mode,
+              // only allow a gesture if it's in the back swipe direction.
+              if (!widget.isLoop && _currentIndex == widget.cardsCount - 1) {
+                if (deltaProjection <= 0) {
+                  // Ignore any gesture that is not along the back swipe direction.
+                  return;
+                }
+              }
+
               // Only trigger back swipe if the card is nearly centered.
               final atCenter = _cardAnimation.left.abs() < 5.0 &&
                   _cardAnimation.top.abs() < 5.0;
@@ -151,6 +160,7 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
               // If not already in back swipe mode and movement is along the back direction:
               if (!_isBackSwipe && atCenter && deltaProjection > 0) {
                 _startBackSwipe();
+                return;
               }
               // If in back swipe mode, update progress.
               if (_isBackSwipe) {
@@ -352,6 +362,11 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
   }
 
   void _onEndAnimation() {
+    if (!widget.isLoop && _currentIndex == widget.cardsCount - 1) {
+      _goBack();
+      return;
+    }
+
     final direction = _getEndAnimationDirection();
     final isValidDirection = _isValidDirection(direction);
 
