@@ -28,6 +28,8 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
   double _backSwipeProgress = 0.0;
   int? _originalIndex; // to store the card before starting a back swipe
 
+  final slowBackSwipeFactor = 0.25;
+
   @override
   void initState() {
     super.initState();
@@ -148,9 +150,8 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
               }
               // If in back swipe mode, update progress.
               if (_isBackSwipe) {
-                const progressEaseFactor = 0.15;
-                _backSwipeDragDistance += deltaProjection * progressEaseFactor;
-                double progress =
+                _backSwipeDragDistance += deltaProjection * slowBackSwipeFactor;
+                final progress =
                     (_backSwipeDragDistance / widget.threshold).clamp(0.0, 1.0);
                 _updateBackSwipeProgress(progress);
                 return;
@@ -169,20 +170,20 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
         onPanEnd: (tapInfo) {
           if (_isBackSwipe) {
             if (_backSwipeProgress >= 0.5) {
-              // if passed threshold, complete from current state
-              _swipeType = SwipeType
-                  .undo; // you can also use a dedicated enum for backSwipeComplete
+              // Complete the back swipe from the current state to centered.
+              _swipeType = SwipeType.undo;
               _cardAnimation.animateBackSwipeComplete(context);
             } else {
-              // Cancel the back swipe: animate from current state to the off-screen target.
+              // Cancel: animate from current state back to the opposite off–screen position.
               _swipeType = SwipeType.backSwipeCancel;
               final size = MediaQuery.of(context).size;
               final angleRad = (widget.allowedSwipeBackDirection!.angle - 90) *
                   math.pi /
                   180;
               final magnitude = size.width;
-              final targetLeft = magnitude * math.cos(angleRad);
-              final targetTop = magnitude * math.sin(angleRad);
+              // Calculate the off–screen target from the opposite direction.
+              final targetLeft = -magnitude * math.cos(angleRad);
+              final targetTop = -magnitude * math.sin(angleRad);
               _cardAnimation.animateUndoCancel(
                 context,
                 targetLeft,
@@ -207,7 +208,7 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
 
   void _startBackSwipe() {
     if (_currentIndex == null) return;
-    // Determine the previous card index (same logic as in _backSwipe)
+    // Determine the previous card index (same logic as before)
     int prevIndex;
     if (widget.isLoop) {
       prevIndex = (_currentIndex! - 1 + widget.cardsCount) % widget.cardsCount;
@@ -216,17 +217,17 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
       prevIndex = _currentIndex! - 1;
     }
     _swipeType = SwipeType.backSwipe;
-    _originalIndex =
-        _currentIndex; // store current index in case of cancellation
+    _originalIndex = _currentIndex; // save original index in case of cancel
     _undoableIndex.state = prevIndex; // update current index to previous card
 
-    // Set the initial undo animation values (off-screen)
     final size = MediaQuery.of(context).size;
+    // Compute the starting position from the opposite direction:
     final angleRad =
         (widget.allowedSwipeBackDirection!.angle - 90) * math.pi / 180;
     final magnitude = size.width;
-    final startX = magnitude * math.cos(angleRad);
-    final startY = magnitude * math.sin(angleRad);
+    // Multiply by -1 to get the opposite side.
+    final startX = -magnitude * math.cos(angleRad);
+    final startY = -magnitude * math.sin(angleRad);
     setState(() {
       _cardAnimation.left = startX;
       _cardAnimation.top = startY;
@@ -243,8 +244,9 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
     final angleRad =
         (widget.allowedSwipeBackDirection!.angle - 90) * math.pi / 180;
     final magnitude = size.width;
-    final startX = magnitude * math.cos(angleRad);
-    final startY = magnitude * math.sin(angleRad);
+    // Use negative starting values for the opposite direction.
+    final startX = -magnitude * math.cos(angleRad);
+    final startY = -magnitude * math.sin(angleRad);
 
     setState(() {
       _cardAnimation.left = startX * (1 - progress);
@@ -278,30 +280,7 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
       ControllerSwipeEvent(:final direction) => _swipe(direction),
       ControllerUndoEvent() => _undo(),
       ControllerMoveEvent(:final index) => _moveTo(index),
-      ControllerBackEvent() => _backSwipe(),
     };
-  }
-
-  void _backSwipe() {
-    // Only proceed if a back swipe direction is provided.
-    if (widget.allowedSwipeBackDirection == null) return;
-    if (_currentIndex == null) return;
-
-    // Determine the previous index.
-    int prevIndex;
-    if (widget.isLoop) {
-      prevIndex = (_currentIndex! - 1 + widget.cardsCount) % widget.cardsCount;
-    } else {
-      if (_currentIndex! == 0) return; // no previous card available
-      prevIndex = _currentIndex! - 1;
-    }
-
-    // Set the swipe type to backSwipe.
-    _swipeType = SwipeType.backSwipe;
-    // Update the current index to the previous card.
-    _undoableIndex.state = prevIndex;
-    // Animate the new (previous) card into view using the undo animation.
-    _cardAnimation.animateUndo(context, widget.allowedSwipeBackDirection!);
   }
 
   void _animationListener() {
@@ -315,7 +294,6 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
       switch (_swipeType) {
         case SwipeType.swipe:
           await _handleCompleteSwipe();
-          break;
         case SwipeType.undo:
           // Undo callback already handled in _undo()
           break;
@@ -325,7 +303,6 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
         case SwipeType.backSwipeCancel:
           // Revert back to the original card.
           _undoableIndex.state = _originalIndex;
-          break;
         default:
           break;
       }

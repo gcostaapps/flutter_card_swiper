@@ -47,7 +47,8 @@ class _ExamplePageState extends State<Example> {
                 maxAngle: 0,
                 numberOfCardsDisplayed: 3,
                 allowedSwipeBackDirection: CardSwiperDirection.left,
-                allowedSwipeDirection: AllowedSwipeDirection.only(right: true),
+                allowedSwipeDirection:
+                    const AllowedSwipeDirection.only(right: true),
                 backCardOffset: const Offset(40, 40),
                 padding: const EdgeInsets.all(24.0),
                 cardBuilder: (
@@ -64,10 +65,6 @@ class _ExamplePageState extends State<Example> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  FloatingActionButton(
-                    onPressed: controller.back,
-                    child: const Icon(Icons.arrow_back),
-                  ),
                   FloatingActionButton(
                     onPressed: controller.undo,
                     child: const Icon(Icons.rotate_left),

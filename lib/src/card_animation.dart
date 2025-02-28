@@ -262,27 +262,22 @@ class CardAnimation {
   }
 
   void animateBackSwipeComplete(BuildContext context) {
-    // Start from current state and animate to the centered state.
     _leftAnimation = Tween<double>(
       begin: left,
       end: 0,
     ).animate(animationController);
-
     _topAnimation = Tween<double>(
       begin: top,
       end: 0,
     ).animate(animationController);
-
     _scaleAnimation = Tween<double>(
       begin: scale,
       end: initialScale,
     ).animate(animationController);
-
     _differenceAnimation = Tween<Offset>(
       begin: difference,
       end: Offset.zero,
     ).animate(animationController);
-
     animationController.forward();
   }
 }

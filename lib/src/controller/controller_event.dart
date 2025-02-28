@@ -17,7 +17,3 @@ class ControllerMoveEvent extends ControllerEvent {
   final int index;
   const ControllerMoveEvent(this.index);
 }
-
-class ControllerBackEvent extends ControllerEvent {
-  const ControllerBackEvent();
-}

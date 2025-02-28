@@ -28,8 +28,4 @@ class CardSwiperController {
   Future<void> dispose() async {
     await _eventController.close();
   }
-
-  void back() {
-    _eventController.add(const ControllerBackEvent());
-  }
 }
