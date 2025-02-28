@@ -165,7 +165,30 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
       ControllerSwipeEvent(:final direction) => _swipe(direction),
       ControllerUndoEvent() => _undo(),
       ControllerMoveEvent(:final index) => _moveTo(index),
+      ControllerBackEvent() => _backSwipe(),
     };
+  }
+
+  void _backSwipe() {
+    // Only proceed if a back swipe direction is provided.
+    if (widget.allowedSwipeBackDirection == null) return;
+    if (_currentIndex == null) return;
+
+    // Determine the previous index.
+    int prevIndex;
+    if (widget.isLoop) {
+      prevIndex = (_currentIndex! - 1 + widget.cardsCount) % widget.cardsCount;
+    } else {
+      if (_currentIndex! == 0) return; // no previous card available
+      prevIndex = _currentIndex! - 1;
+    }
+
+    // Set the swipe type to backSwipe.
+    _swipeType = SwipeType.backSwipe;
+    // Update the current index to the previous card.
+    _undoableIndex.state = prevIndex;
+    // Animate the new (previous) card into view using the undo animation.
+    _cardAnimation.animateUndo(context, widget.allowedSwipeBackDirection!);
   }
 
   void _animationListener() {
@@ -179,10 +202,16 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
       switch (_swipeType) {
         case SwipeType.swipe:
           await _handleCompleteSwipe();
+          break;
+        case SwipeType.undo:
+          // Undo callback already handled in _undo()
+          break;
+        case SwipeType.backSwipe:
+          // For back swipe no extra callback is needed.
+          break;
         default:
           break;
       }
-
       _reset();
     }
   }
