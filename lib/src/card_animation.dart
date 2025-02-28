@@ -115,21 +115,29 @@ class CardAnimation {
   }
 
   void updateDifference() {
+    // Compute a basic discrepancy from the total swipe amount.
     final discrepancy = (total / 10).abs();
 
-    var diffX = 0.0;
-    var diffY = 0.0;
+    // Clamp the discrepancy for each axis based on the initial offset.
+    final maxDiffX = initialOffset.dx.abs();
+    final maxDiffY = initialOffset.dy.abs();
+    final clampedDiffX = math.min(discrepancy, maxDiffX);
+    final clampedDiffY = math.min(discrepancy, maxDiffY);
 
+    double diffX = 0;
+    double diffY = 0;
+
+    // Apply the clamped values, preserving the direction.
     if (initialOffset.dx > 0) {
-      diffX = discrepancy;
+      diffX = clampedDiffX;
     } else if (initialOffset.dx < 0) {
-      diffX = -discrepancy;
+      diffX = -clampedDiffX;
     }
 
     if (initialOffset.dy < 0) {
-      diffY = -discrepancy;
+      diffY = -clampedDiffY;
     } else if (initialOffset.dy > 0) {
-      diffY = discrepancy;
+      diffY = clampedDiffY;
     }
 
     difference = Offset(diffX, diffY);
