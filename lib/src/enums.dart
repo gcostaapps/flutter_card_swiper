@@ -1,1 +1,1 @@
-enum SwipeType { none, swipe, back, undo, backSwipe }
+enum SwipeType { none, swipe, back, undo, backSwipe, backSwipeCancel }

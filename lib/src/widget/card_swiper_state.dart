@@ -22,6 +22,12 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
 
   StreamSubscription<ControllerEvent>? controllerSubscription;
 
+  // New state variables for interactive back swipe:
+  bool _isBackSwipe = false;
+  double _backSwipeDragDistance = 0.0;
+  double _backSwipeProgress = 0.0;
+  int? _originalIndex; // to store the card before starting a back swipe
+
   @override
   void initState() {
     super.initState();
@@ -121,12 +127,36 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
           if (!widget.isDisabled) {
             final renderBox = context.findRenderObject()! as RenderBox;
             final position = renderBox.globalToLocal(tapInfo.globalPosition);
-
             if (position.dy < renderBox.size.height / 2) _tappedOnTop = true;
           }
         },
         onPanUpdate: (tapInfo) {
           if (!widget.isDisabled) {
+            // If an allowed back swipe direction is provided,
+            // compute the dot product of the delta with that direction.
+            if (widget.allowedSwipeBackDirection != null) {
+              final angleRad = (widget.allowedSwipeBackDirection!.angle - 90) *
+                  math.pi /
+                  180;
+              final backDir = Offset(math.cos(angleRad), math.sin(angleRad));
+              final deltaProjection =
+                  tapInfo.delta.dx * backDir.dx + tapInfo.delta.dy * backDir.dy;
+
+              // If not already in back swipe mode and movement is along the back direction:
+              if (!_isBackSwipe && deltaProjection > 0) {
+                _startBackSwipe();
+              }
+              // If in back swipe mode, update progress.
+              if (_isBackSwipe) {
+                const progressEaseFactor = 0.15;
+                _backSwipeDragDistance += deltaProjection * progressEaseFactor;
+                double progress =
+                    (_backSwipeDragDistance / widget.threshold).clamp(0.0, 1.0);
+                _updateBackSwipeProgress(progress);
+                return;
+              }
+            }
+            // Otherwise, perform normal swipe update.
             setState(
               () => _cardAnimation.update(
                 tapInfo.delta.dx,
@@ -137,6 +167,35 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
           }
         },
         onPanEnd: (tapInfo) {
+          if (_isBackSwipe) {
+            if (_backSwipeProgress >= 0.5) {
+              // if passed threshold, complete from current state
+              _swipeType = SwipeType
+                  .undo; // you can also use a dedicated enum for backSwipeComplete
+              _cardAnimation.animateBackSwipeComplete(context);
+            } else {
+              // Cancel the back swipe: animate from current state to the off-screen target.
+              _swipeType = SwipeType.backSwipeCancel;
+              final size = MediaQuery.of(context).size;
+              final angleRad = (widget.allowedSwipeBackDirection!.angle - 90) *
+                  math.pi /
+                  180;
+              final magnitude = size.width;
+              final targetLeft = magnitude * math.cos(angleRad);
+              final targetTop = magnitude * math.sin(angleRad);
+              _cardAnimation.animateUndoCancel(
+                context,
+                targetLeft,
+                targetTop,
+                1.0, // target scale (off-screen)
+                widget.backCardOffset,
+              );
+            }
+            _isBackSwipe = false;
+            _backSwipeDragDistance = 0.0;
+            _backSwipeProgress = 0.0;
+            return;
+          }
           if (_canSwipe) {
             _tappedOnTop = false;
             _onEndAnimation();
@@ -144,6 +203,60 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
         },
       ),
     );
+  }
+
+  void _startBackSwipe() {
+    if (_currentIndex == null) return;
+    // Determine the previous card index (same logic as in _backSwipe)
+    int prevIndex;
+    if (widget.isLoop) {
+      prevIndex = (_currentIndex! - 1 + widget.cardsCount) % widget.cardsCount;
+    } else {
+      if (_currentIndex! == 0) return; // no previous card available
+      prevIndex = _currentIndex! - 1;
+    }
+    _swipeType = SwipeType.backSwipe;
+    _originalIndex =
+        _currentIndex; // store current index in case of cancellation
+    _undoableIndex.state = prevIndex; // update current index to previous card
+
+    // Set the initial undo animation values (off-screen)
+    final size = MediaQuery.of(context).size;
+    final angleRad =
+        (widget.allowedSwipeBackDirection!.angle - 90) * math.pi / 180;
+    final magnitude = size.width;
+    final startX = magnitude * math.cos(angleRad);
+    final startY = magnitude * math.sin(angleRad);
+    setState(() {
+      _cardAnimation.left = startX;
+      _cardAnimation.top = startY;
+      _cardAnimation.scale = 1.0;
+      _cardAnimation.difference = widget.backCardOffset;
+      _isBackSwipe = true;
+      _backSwipeDragDistance = 0.0;
+      _backSwipeProgress = 0.0;
+    });
+  }
+
+  void _updateBackSwipeProgress(double progress) {
+    final size = MediaQuery.of(context).size;
+    final angleRad =
+        (widget.allowedSwipeBackDirection!.angle - 90) * math.pi / 180;
+    final magnitude = size.width;
+    final startX = magnitude * math.cos(angleRad);
+    final startY = magnitude * math.sin(angleRad);
+
+    setState(() {
+      _cardAnimation.left = startX * (1 - progress);
+      _cardAnimation.top = startY * (1 - progress);
+      // Interpolate scale from 1.0 (off-screen) to widget.scale (final)
+      _cardAnimation.scale = 1.0 + (widget.scale - 1.0) * progress;
+      // Interpolate difference from the starting backCardOffset to zero.
+      _cardAnimation.difference =
+          Offset.lerp(widget.backCardOffset, Offset.zero, progress) ??
+              Offset.zero;
+      _backSwipeProgress = progress;
+    });
   }
 
   Widget _backItem(BoxConstraints constraints, int index) {
@@ -207,7 +320,11 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
           // Undo callback already handled in _undo()
           break;
         case SwipeType.backSwipe:
-          // For back swipe no extra callback is needed.
+          // For a completed back swipe, no extra callback is needed.
+          break;
+        case SwipeType.backSwipeCancel:
+          // Revert back to the original card.
+          _undoableIndex.state = _originalIndex;
           break;
         default:
           break;
@@ -237,6 +354,8 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
   void _reset() {
     onSwipeDirectionChanged(CardSwiperDirection.none);
     _detectedDirection = CardSwiperDirection.none;
+    _originalIndex = null;
+    _isBackSwipe = false;
     setState(() {
       _animationController.reset();
       _cardAnimation.reset();

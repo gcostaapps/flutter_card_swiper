@@ -230,4 +230,59 @@ class CardAnimation {
 
     animationController.forward();
   }
+
+  void animateUndoCancel(
+    BuildContext context,
+    double targetLeft,
+    double targetTop,
+    double targetScale,
+    Offset targetDifference,
+  ) {
+    _leftAnimation = Tween<double>(
+      begin: left,
+      end: targetLeft,
+    ).animate(animationController);
+
+    _topAnimation = Tween<double>(
+      begin: top,
+      end: targetTop,
+    ).animate(animationController);
+
+    _scaleAnimation = Tween<double>(
+      begin: scale,
+      end: targetScale,
+    ).animate(animationController);
+
+    _differenceAnimation = Tween<Offset>(
+      begin: difference,
+      end: targetDifference,
+    ).animate(animationController);
+
+    animationController.forward();
+  }
+
+  void animateBackSwipeComplete(BuildContext context) {
+    // Start from current state and animate to the centered state.
+    _leftAnimation = Tween<double>(
+      begin: left,
+      end: 0,
+    ).animate(animationController);
+
+    _topAnimation = Tween<double>(
+      begin: top,
+      end: 0,
+    ).animate(animationController);
+
+    _scaleAnimation = Tween<double>(
+      begin: scale,
+      end: initialScale,
+    ).animate(animationController);
+
+    _differenceAnimation = Tween<Offset>(
+      begin: difference,
+      end: Offset.zero,
+    ).animate(animationController);
+
+    animationController.forward();
+  }
 }
