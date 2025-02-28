@@ -46,10 +46,12 @@ class _ExamplePageState extends State<Example> {
                 onUndo: _onUndo,
                 maxAngle: 0,
                 numberOfCardsDisplayed: 3,
+                isLoop: false,
                 allowedSwipeBackDirection: CardSwiperDirection.left,
                 allowedSwipeDirection:
                     const AllowedSwipeDirection.only(right: true),
-                backCardOffset: const Offset(40, 40),
+                backCardOffset:
+                    Offset(MediaQuery.sizeOf(context).width * 0.06, 00),
                 padding: const EdgeInsets.all(24.0),
                 cardBuilder: (
                   context,

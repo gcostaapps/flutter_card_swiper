@@ -100,7 +100,6 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
                 },
                 onPanUpdate: (tapInfo) {
                   if (!widget.isDisabled) {
-                    print('onPanUpdate ${tapInfo.toString()}');
                     if (widget.allowedSwipeBackDirection != null) {
                       final angleRad =
                           (widget.allowedSwipeBackDirection!.angle - 90) *
