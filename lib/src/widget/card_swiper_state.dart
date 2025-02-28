@@ -168,8 +168,9 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
           }
         },
         onPanEnd: (tapInfo) {
+          final velocity = tapInfo.velocity.pixelsPerSecond.distance;
           if (_isBackSwipe) {
-            if (_backSwipeProgress >= 0.5) {
+            if (_backSwipeProgress >= 0.3 || velocity > 1000) {
               // Complete the back swipe from the current state to centered.
               _swipeType = SwipeType.undo;
               _cardAnimation.animateBackSwipeComplete(context);
