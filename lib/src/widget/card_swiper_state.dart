@@ -144,8 +144,12 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
               final deltaProjection =
                   tapInfo.delta.dx * backDir.dx + tapInfo.delta.dy * backDir.dy;
 
+              // Only trigger back swipe if the card is nearly centered.
+              final atCenter = _cardAnimation.left.abs() < 5.0 &&
+                  _cardAnimation.top.abs() < 5.0;
+
               // If not already in back swipe mode and movement is along the back direction:
-              if (!_isBackSwipe && deltaProjection > 0) {
+              if (!_isBackSwipe && atCenter && deltaProjection > 0) {
                 _startBackSwipe();
               }
               // If in back swipe mode, update progress.
