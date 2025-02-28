@@ -151,7 +151,7 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
               // If in back swipe mode, update progress.
               if (_isBackSwipe) {
                 _backSwipeDragDistance += deltaProjection * slowBackSwipeFactor;
-                final progress =
+                double progress =
                     (_backSwipeDragDistance / widget.threshold).clamp(0.0, 1.0);
                 _updateBackSwipeProgress(progress);
                 return;
@@ -294,6 +294,7 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
       switch (_swipeType) {
         case SwipeType.swipe:
           await _handleCompleteSwipe();
+          break;
         case SwipeType.undo:
           // Undo callback already handled in _undo()
           break;
@@ -303,6 +304,7 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
         case SwipeType.backSwipeCancel:
           // Revert back to the original card.
           _undoableIndex.state = _originalIndex;
+          break;
         default:
           break;
       }
