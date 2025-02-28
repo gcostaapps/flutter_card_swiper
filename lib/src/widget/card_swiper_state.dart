@@ -172,7 +172,7 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
           if (_isBackSwipe) {
             if (_backSwipeProgress >= 0.3 || velocity > 1000) {
               // Complete the back swipe from the current state to centered.
-              _swipeType = SwipeType.undo;
+              _swipeType = SwipeType.backSwipe;
               _cardAnimation.animateBackSwipeComplete(context);
             } else {
               // Cancel: animate from current state back to the opposite off–screen position.
@@ -300,7 +300,11 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
           // Undo callback already handled in _undo()
           break;
         case SwipeType.backSwipe:
-          // For a completed back swipe, no extra callback is needed.
+          final oldIndex =
+              _originalIndex ?? _undoableIndex.previousState ?? _currentIndex!;
+          final newIndex = _currentIndex!;
+          final direction = widget.allowedSwipeBackDirection!;
+          widget.onSwipe?.call(oldIndex, newIndex, direction);
           break;
         case SwipeType.backSwipeCancel:
           // Revert back to the original card.
