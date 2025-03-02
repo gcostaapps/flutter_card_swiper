@@ -285,7 +285,42 @@ class _CardSwiperState<T extends Widget> extends State<CardSwiper>
       ControllerSwipeEvent(:final direction) => _swipe(direction),
       ControllerUndoEvent() => _undo(),
       ControllerMoveEvent(:final index) => _moveTo(index),
+      ControllerBackEvent() => _goBackFromController(),
     };
+  }
+
+  void _goBackFromController() {
+    if (_currentIndex == null) return;
+    int prevIndex;
+    if (widget.isLoop) {
+      prevIndex = (_currentIndex! - 1 + widget.cardsCount) % widget.cardsCount;
+    } else {
+      if (_currentIndex! == 0) return;
+      prevIndex = _currentIndex! - 1;
+    }
+
+    _swipeType = SwipeType.backSwipe;
+    _originalIndex = _currentIndex;
+    _undoableIndex.state = prevIndex;
+
+    final size = MediaQuery.of(context).size;
+    final angleRad =
+        (widget.allowedSwipeBackDirection!.angle - 90) * math.pi / 180;
+    final magnitude = size.width;
+    final startX = -magnitude * math.cos(angleRad);
+    final startY = -magnitude * math.sin(angleRad);
+
+    setState(() {
+      _cardAnimation.left = startX;
+      _cardAnimation.top = startY;
+      _cardAnimation.scale = 1.0;
+      _cardAnimation.difference = widget.backCardOffset;
+      _isBackSwipe = true;
+      _backSwipeDragDistance = 0.0;
+      _backSwipeProgress = 0.0;
+    });
+
+    _cardAnimation.animateBackSwipeComplete(context);
   }
 
   void _animationListener() {

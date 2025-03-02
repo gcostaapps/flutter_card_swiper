@@ -25,6 +25,11 @@ class CardSwiperController {
     _eventController.add(ControllerMoveEvent(index));
   }
 
+  /// Trigger the back animation.
+  void back() {
+    _eventController.add(const ControllerBackEvent());
+  }
+
   Future<void> dispose() async {
     await _eventController.close();
   }
